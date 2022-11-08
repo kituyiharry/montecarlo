@@ -38,17 +38,20 @@ let euclidean2 a' =
   { x= sqrt (((a'.x -. origin.x)**2.) +. ((a'.y -. origin.y)**2.)); y = 0. }
 ;;
 
+let idx = Array.unsafe_get
+let isx = Array.unsafe_set
+
 let estimate_par_reduce iters pool =
   let buff = Array.init iters (randpoint) in
   (
     let _ =
       Task.run pool
         (fun _ -> Task.parallel_for ~start:0 ~finish:(iters-1)
-          ~body:(fun i -> (buff.(i) <- (euclidean2 buff.(i)))) pool)
+          ~body:(fun i -> (isx buff i (euclidean2 (idx buff i)))) pool)
     in
       Task.run pool
        (fun _ -> Task.parallel_for_reduce pool (!+.) (origin)
-          ~start:0 ~finish:(iters-1) ~body:(fun i -> buff.(i)) )
+          ~start:0 ~finish:(iters-1) ~body:(idx buff))
   )
   |> fst
   |> quadsolve iters
@@ -60,12 +63,12 @@ let estimate_par_scan iters pool =
     let _ =
       Task.run pool
         (fun _ -> Task.parallel_for ~start:0 ~finish:(iters-1)
-          ~body:(fun i -> (buff.(i) <- (euclidean2 buff.(i)))) pool)
+          ~body:(fun i -> (isx buff i (euclidean2 (idx buff i)))) pool)
     in
       Task.run pool
         (fun _ -> Task.parallel_scan pool (!+.) buff)
   ) in
-  (Array.unsafe_get scarr (iters-1)).x
+  (idx scarr (iters-1)).x
   |> quadsolve iters
 ;;
 
