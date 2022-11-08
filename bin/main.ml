@@ -87,9 +87,9 @@ let fmain upto =
     let size = rangevals.(i-1) in timeonly (fun _ -> estimate size) size
   done;
 
-  Format.printf "\nMulti Thread SCAN\n\n";
+  let pool = Task.setup_pool ~num_domains:4 ~name:"MonteCarlo" () in
 
-  let pool = Task.setup_pool ~num_domains:8 ~name:"MonteCarlo" () in
+  Format.printf "\nMulti Thread SCAN\n\n";
 
   for i = 1 to upto do
     let size = rangevals.(i-1) in timeonly (fun _ -> estimate_par_scan size pool) size
