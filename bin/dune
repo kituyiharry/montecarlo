@@ -1,0 +1,4 @@
+(executable
+ (public_name monte)
+ (name main)
+ (libraries monte domainslib unix core base stdlib))
