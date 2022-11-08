@@ -17,6 +17,7 @@ let euclidean a a' =
 
 let quadsolve iterations hits =
   ((4. *. hits) /. Float.of_int iterations)
+;;
 
 let randpoint _ = { x = (Random.float 1.); y = (Random.float 1.)  }
 
@@ -33,9 +34,14 @@ let estimate iters =
 (* for point2d reductions when collapsed into the x param for 'a -> 'a *)
 let (!+.) f g' = { x = f.x +. g'.x; y = 0. }
 
-(* for 'a -> 'a cases, collapse result into x - see estimate_par *)
+(* for 'a -> 'a cases, collapse result into x - see estimate_par_* *)
 let euclidean2 a' =
   { x= sqrt (((a'.x -. origin.x)**2.) +. ((a'.y -. origin.y)**2.)); y = 0. }
+;;
+
+(* for 'a -> 'a -> 'a cases, collapse result into x - see estimate_par_join *)
+let jointedeuclidean2 a a' =
+  { x= a.x +. sqrt (((a'.x -. origin.x)**2.) +. ((a'.y -. origin.y)**2.)); y = 0. }
 ;;
 
 let idx = Array.unsafe_get
@@ -70,6 +76,15 @@ let estimate_par_scan iters pool =
   |> quadsolve iters
 ;;
 
+let estimate_par_join_scan iters pool =
+  let buff = Array.init iters (randpoint) in
+  (idx (
+      Task.run pool
+        (fun _ -> Task.parallel_scan pool (jointedeuclidean2) buff)
+  ) (iters-1)).x
+  |> quadsolve iters
+;;
+
 
 let timeonly f size =
   let t = Unix.gettimeofday () in
@@ -99,6 +114,12 @@ let fmain upto =
 
   for i = 1 to upto do
     let size = rangevals.(i-1) in timeonly (fun _ -> estimate_par_reduce size pool) size
+  done;
+
+  Format.printf "\nMulti Thread JOINSCAN\n\n";
+
+  for i = 1 to upto do
+    let size = rangevals.(i-1) in timeonly (fun _ -> estimate_par_join_scan size pool) size
   done;
 
   Task.teardown_pool (pool)
