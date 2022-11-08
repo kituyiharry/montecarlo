@@ -31,11 +31,11 @@ let fst p = p.x
 (*let snd p = p.y*)
 
 (* for point2d reductions when collapsed into the x param for 'a -> 'a *)
-let (!+.) f g' = { g' with x = f.x +. g'.x }
+let (!+.) f g' = { x = f.x +. g'.x; y = 0. }
 
 (* for 'a -> 'a cases, collapse result into x - see estimate_par *)
 let euclidean2 a' =
-  { a' with x= sqrt (((a'.x -. origin.x)**2.) +. ((a'.y -. origin.y)**2.)) }
+  { x= sqrt (((a'.x -. origin.x)**2.) +. ((a'.y -. origin.y)**2.)); y = 0. }
 ;;
 
 let estimate_par_reduce iters pool =
@@ -65,8 +65,7 @@ let estimate_par_scan iters pool =
       Task.run pool
         (fun _ -> Task.parallel_scan pool (!+.) buff)
   ) in
-  Array.unsafe_get scarr (iters-1)
-  |> fst
+  (Array.unsafe_get scarr (iters-1)).x
   |> quadsolve iters
 ;;
 
@@ -79,7 +78,7 @@ let timeonly f size =
 
 
 let fmain upto =
-  let rangevals = [|10;100;1000;10000;1000000;100000000;1000000000|] in
+  let rangevals = [|10;100;1000;10000;1000000;1234567;4999999;100000000;1000000000|] in
 
   Format.printf "\nSingle Thread\n\n";
 
@@ -103,4 +102,4 @@ let fmain upto =
 
   Task.teardown_pool (pool)
 
-let () = fmain 5
+let () = fmain 7
