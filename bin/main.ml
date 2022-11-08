@@ -27,7 +27,7 @@ let estimate iters =
    |> quadsolve iters
 ;;
 
-let fst p = p.x
+(*let fst p = p.x*)
 (*let snd p = p.y*)
 
 (* for point2d reductions when collapsed into the x param for 'a -> 'a *)
@@ -52,14 +52,13 @@ let estimate_par_reduce iters pool =
       Task.run pool
        (fun _ -> Task.parallel_for_reduce pool (!+.) (origin)
           ~start:0 ~finish:(iters-1) ~body:(idx buff))
-  )
-  |> fst
+  ).x
   |> quadsolve iters
 ;;
 
 let estimate_par_scan iters pool =
   let buff = Array.init iters (randpoint) in
-  let scarr = (
+  (idx (
     let _ =
       Task.run pool
         (fun _ -> Task.parallel_for ~start:0 ~finish:(iters-1)
@@ -67,8 +66,7 @@ let estimate_par_scan iters pool =
     in
       Task.run pool
         (fun _ -> Task.parallel_scan pool (!+.) buff)
-  ) in
-  (idx scarr (iters-1)).x
+  ) (iters-1)).x
   |> quadsolve iters
 ;;
 
