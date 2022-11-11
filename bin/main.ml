@@ -8,7 +8,7 @@ open Stdlib
 
 type point2d = { x: float; y: float};;
 
-let origin    = { x = 0.; y = 0. }
+let origin   = { x = 0.; y = 0. }
 
 
 let euclidean a a' =
@@ -93,7 +93,7 @@ let timeonly f size =
 ;;
 
 
-let fmain upto =
+let fmain upto num_domains =
   let rangevals = [|10;100;1000;10000;1000000;1234567;4999999;100000000;1000000000|] in
 
   Format.printf "\nSingle Thread\n\n";
@@ -102,7 +102,7 @@ let fmain upto =
     let size = rangevals.(i-1) in timeonly (fun _ -> estimate size) size
   done;
 
-  let pool = Task.setup_pool ~num_domains:4 ~name:"MonteCarlo" () in
+  let pool = Task.setup_pool ~num_domains:num_domains  ~name:"MonteCarlo" () in
 
   Format.printf "\nMulti Thread SCAN\n\n";
 
@@ -124,4 +124,12 @@ let fmain upto =
 
   Task.teardown_pool (pool)
 
-let () = fmain 7
+let () =
+  (* Read number of domains from Environment *)
+  match Sys.getenv_opt "NDOMS" with
+  | Some v ->
+      ( match int_of_string_opt v with
+      | Some d -> fmain 7 d
+      | _ -> fmain 7 8 )
+  | _ -> fmain 7 8
+;;
