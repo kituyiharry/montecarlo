@@ -47,12 +47,12 @@ let (!+.) f g' = { x = f.x +. g'.x; y = 0. }
 
 let specificeuclidean buff i =
   let a' = idx buff i in
-  a'.x <- sqrt (((a'.x -. origin.x)**2.) +. ((a'.y -. origin.y)**2.));
+  a'.x <- euclidean a' origin;
 ;;
 
 (* for 'a -> 'a -> 'a cases, collapse result into x - see estimate_par_join *)
 let muta_euclidean a a' =
-  a.x <- (a.x +. sqrt (((a'.x -. origin.x)**2.) +. ((a'.y -. origin.y)**2.)));
+  a.x <- euclidean a a' ;
   a
 ;;
 
