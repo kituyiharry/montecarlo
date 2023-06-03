@@ -6,10 +6,9 @@
 open Domainslib
 open Stdlib
 
-type point2d = { mutable x: float; y: float};;
+type point2d = { x: float; y: float};;
 
 let origin   = { x = 0.; y = 0. }
-
 
 let euclidean a a' =
     sqrt (((a'.x -. a.x)**2.) +. ((a'.y -. a.y)**2.))
@@ -21,82 +20,29 @@ let quadsolve iterations hits =
 
 let randpoint _ = { x = (Random.float 1.); y = (Random.float 1.)  }
 
+let is_in_unit_circle x y = if (euclidean x y) <= 1. then 1. else 0.
+
 let estimate iters =
    Array.init iters (randpoint)
-   |> Array.map (euclidean origin)
-   |> Array.fold_left (+.) 0.
+   |> Array.map (is_in_unit_circle origin)
+   |> Array.fold_left (+.)  0.
    |> quadsolve iters
 ;;
 
-(*let fst p = p.x*)
-(*let snd p = p.y*)
 let idx = Array.unsafe_get
-(*let isx = Aray.unsafe_set*)
 
-(* for point2d reductions when collapsed into the x param for 'a -> 'a *)
-let (!+.) f g' = { x = f.x +. g'.x; y = 0. }
-
-(* for point2d reductions with side effects *)
-(*let (!<-.) f g' = f.x <- (f.x +. g'.x); f*)
-
-(* for 'a -> 'a cases, collapse result into x - see estimate_par_* *)
-(*let euclidean2 a' =*)
-  (*a'.x <- sqrt (((a'.x -. origin.x)**2.) +. ((a'.y -. origin.y)**2.));*)
-  (*(*a'*)*)
-(*;;*)
-
-let specificeuclidean buff i =
-  let a' = idx buff i in
-  a'.x <- euclidean a' origin;
-;;
-
-(* for 'a -> 'a -> 'a cases, collapse result into x - see estimate_par_join *)
-let muta_euclidean a a' =
-  a.x <- euclidean a a' ;
-  a
-;;
-
-
-let estimate_par_reduce iters pool =
+let estimate_par_for_reduce iters pool =
   let buff = Array.init iters (randpoint) in
-  (
-    let _ =
-      Task.run pool
-        (fun _ -> Task.parallel_for ~start:0 ~finish:(iters-1)
-          (*~body:(fun i -> (isx buff i (euclidean2 (idx buff i)))) pool)*)
-          ~body:(specificeuclidean buff) pool)
-    in
-      Task.run pool
-       (fun _ -> Task.parallel_for_reduce pool (!+.) (origin)
-          ~start:0 ~finish:(iters-1) ~body:(idx buff))
-  ).x
+  (Task.run pool
+    (fun _ ->
+      Task.parallel_for_reduce
+        ~start:0 ~finish:(iters-1)
+        ~body:(fun i -> is_in_unit_circle origin (idx buff i))
+        pool (+.) (0.)
+    )
+  )
   |> quadsolve iters
 ;;
-
-let estimate_par_scan iters pool =
-  let buff = Array.init iters (randpoint) in
-  (idx (
-    let _ =
-      Task.run pool
-        (fun _ -> Task.parallel_for ~start:0 ~finish:(iters-1)
-          (*~body:(fun i -> (isx buff i (euclidean2 (idx buff i)))) pool)*)
-          ~body:(specificeuclidean buff) pool)
-    in
-      Task.run pool
-        (fun _ -> Task.parallel_scan pool (!+.) buff)
-  ) (iters-1)).x
-  |> quadsolve iters
-;;
-
-let estimate_par_join_scan iters pool =
-  let buff = Array.init iters (randpoint) in
-  (idx (
-      Task.run pool
-        (fun _ -> Task.parallel_scan pool (muta_euclidean) buff)
-  ) (iters-1)).x
-  |> quadsolve iters
-;;
-
 
 let timeonly f size =
   let t = Unix.gettimeofday () in
@@ -105,7 +51,7 @@ let timeonly f size =
 ;;
 
 let next_rand_size multiple =
-  Float.to_int ((Random.float 1.) *. (Float.pow 10. multiple))
+  Float.to_int (8. *. (Float.pow 8. multiple))
 
 let fmain upto num_domains =
 
@@ -122,22 +68,10 @@ let fmain upto num_domains =
 
   let pool = Task.setup_pool ~num_domains:num_domains  ~name:"MonteCarlo" () in
 
-  Format.printf "\nMulti Thread SCAN\n\n";
+  Format.printf "\nMulti Thread FOR_REDUCE\n\n";
 
   for i = 1 to upto do
-   let size = (next_rand_size (float_of_int i)) in timeonly (fun _ -> estimate_par_scan size pool) size
-  done;
-
-  Format.printf "\nMulti Thread REDUCE\n\n";
-  (* Most stable *)
-  for i = 1 to upto do
-    let size = (next_rand_size (float_of_int i)) in timeonly (fun _ -> estimate_par_reduce size pool) size
-  done;
-
-  Format.printf "\nMulti Thread JOINSCAN\n\n";
-
-  for i = 1 to upto do
-    let size = (next_rand_size (float_of_int i)) in timeonly (fun _ -> estimate_par_join_scan size pool) size
+    let size = (next_rand_size (float_of_int i)) in timeonly (fun _ -> estimate_par_for_reduce size pool) size
   done;
 
   Task.teardown_pool (pool)
