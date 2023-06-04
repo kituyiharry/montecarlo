@@ -26,7 +26,16 @@ let is_in_unit_circle x y = if (euclidean x y) <= 1. then 1. else 0.
   Naive Single Threaded approach  
 *)
 
-let estimate iters =
+let estimate_iterative iters =
+  let hc = ref 0. in
+  for _ = 1 to iters do
+    hc := !hc +. (is_in_unit_circle origin (randpoint ()))
+  done;
+  !hc
+  |> quadsolve iters
+;;
+
+let estimate_functional iters =
    Array.init iters (randpoint)
    |> Array.map (is_in_unit_circle origin)
    |> Array.fold_left (+.)  0.
@@ -37,15 +46,12 @@ let estimate iters =
   Trivial parallelization approach  
 *)
 
-let idx = Array.unsafe_get
-
 let estimate_par_for_reduce iters pool =
-  let buff = Array.init iters (randpoint) in
   (Task.run pool
     (fun _ ->
       Task.parallel_for_reduce
         ~start:0 ~finish:(iters-1)
-        ~body:(fun i -> is_in_unit_circle origin (idx buff i))
+        ~body:(fun _i -> is_in_unit_circle origin (randpoint ()))
         pool (+.) (0.)
     )
   )
@@ -58,11 +64,11 @@ let estimate_par_for_reduce iters pool =
 
 let handle_pi_work size receiver =
   let inscribed = 
-    Array.init size (randpoint)
-    |> Array.fold_left (
-      fun acc point ->
-      acc +. (is_in_unit_circle origin point)
-    ) 0. in
+    let acc = ref 0. in
+    for _ = 1 to size do
+      acc := !acc +. (is_in_unit_circle origin (randpoint ()))
+    done;
+    !acc in
   Chan.send receiver inscribed
 ;;
 
@@ -105,11 +111,18 @@ let fmain upto num_domains =
 
   Format.printf "num_domains: %d" num_domains;
 
-  Format.printf "\nSingle Thread\n\n";
+ Format.printf "\nSingle Thread Functional\n\n";
+ 
+  for i = 1 to upto do
+    (*let size = rangevals.(i-1) in timeonly (fun _ -> estimate size) size*)
+    let size = (next_rand_size (float_of_int i)) in timeonly (fun _ -> estimate_functional size) size
+  done;
+
+ Format.printf "\nSingle Thread Iterative\n\n";
 
   for i = 1 to upto do
     (*let size = rangevals.(i-1) in timeonly (fun _ -> estimate size) size*)
-    let size = (next_rand_size (float_of_int i)) in timeonly (fun _ -> estimate size) size
+    let size = (next_rand_size (float_of_int i)) in timeonly (fun _ -> estimate_iterative size) size
   done;
 
   let pool = Task.setup_pool ~num_domains:num_domains  ~name:"MonteCarlo" () in
