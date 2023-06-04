@@ -22,12 +22,20 @@ let randpoint _ = { x = (Random.float 1.); y = (Random.float 1.)  }
 
 let is_in_unit_circle x y = if (euclidean x y) <= 1. then 1. else 0.
 
+(**
+  Naive Single Threaded approach  
+*)
+
 let estimate iters =
    Array.init iters (randpoint)
    |> Array.map (is_in_unit_circle origin)
    |> Array.fold_left (+.)  0.
    |> quadsolve iters
 ;;
+
+(**
+  Trivial parallelization approach  
+*)
 
 let idx = Array.unsafe_get
 
@@ -44,6 +52,46 @@ let estimate_par_for_reduce iters pool =
   |> quadsolve iters
 ;;
 
+(**
+  Divide and Conquer approach  
+*)
+
+let handle_pi_work size receiver =
+  let inscribed = 
+    Array.init size (randpoint)
+    |> Array.fold_left (
+      fun acc point ->
+      acc +. (is_in_unit_circle origin point)
+    ) 0. in
+  Chan.send receiver inscribed
+;;
+
+let rec spawn_workers num receiver size joined =
+    match num with 
+    | 0 -> joined 
+    | n -> let send = Domain.spawn (
+        fun _ -> handle_pi_work size receiver
+      ) in
+      spawn_workers (n - 1) receiver size (send :: joined)
+;;
+
+let estimate_via_chans doms iters =
+  let chan = Chan.make_bounded doms in
+  let work_per_core = iters/doms in
+  let hitcount = ref 0. in
+  (spawn_workers doms chan work_per_core [])
+  |> (fun domains -> 
+    for _ = 1 to doms do 
+      let hits = Chan.recv chan in 
+      hitcount := !hitcount +. hits
+    done;
+    domains)
+  |> List.iter (Domain.join);
+  (quadsolve iters !hitcount)
+;;
+
+
+
 let timeonly f size =
   let t = Unix.gettimeofday () in
   let res = f () in
@@ -54,8 +102,6 @@ let next_rand_size multiple =
   Float.to_int (8. *. (Float.pow 8. multiple))
 
 let fmain upto num_domains =
-
-  (*let rangevals = [|31;314;3141;31415;3141592;31415926;314159265;3141592653|] in*)
 
   Format.printf "num_domains: %d" num_domains;
 
@@ -74,7 +120,15 @@ let fmain upto num_domains =
     let size = (next_rand_size (float_of_int i)) in timeonly (fun _ -> estimate_par_for_reduce size pool) size
   done;
 
-  Task.teardown_pool (pool)
+
+  Format.printf "\nMulti Thread DIVIDE_AND_CONQUER\n\n";
+
+  for i = 1 to upto do
+    let size = (next_rand_size (float_of_int i)) in timeonly (fun _ ->
+      estimate_via_chans num_domains size) size
+  done;
+
+  Task.teardown_pool (pool);
 
 ;;
 
