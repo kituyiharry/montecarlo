@@ -42,6 +42,13 @@ let estimate_functional iters =
    |> quadsolve iters
 ;;
 
+let estimate_functional_lazy iters =
+   Seq.init iters (fun _i -> randpoint ()) 
+   |> Seq.map (is_in_unit_circle origin)
+   |> Seq.fold_left (+.)  0.
+   |> quadsolve iters
+;;
+
 (**
   Trivial parallelization approach  
 *)
@@ -116,6 +123,13 @@ let fmain upto num_domains =
   for i = 1 to upto do
     (*let size = rangevals.(i-1) in timeonly (fun _ -> estimate size) size*)
     let size = (next_rand_size (float_of_int i)) in timeonly (fun _ -> estimate_functional size) size
+  done;
+
+ Format.printf "\nSingle Thread Functional Lazy\n\n";
+
+  for i = 1 to upto do
+    (*let size = rangevals.(i-1) in timeonly (fun _ -> estimate size) size*)
+    let size = (next_rand_size (float_of_int i)) in timeonly (fun _ -> estimate_functional_lazy size) size
   done;
 
  Format.printf "\nSingle Thread Iterative\n\n";
